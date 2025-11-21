@@ -22,7 +22,7 @@
 
 ### 1. 下载并运行脚本
 ```sh
-wget -O install.sh https://raw.githubusercontent.com/als168/VMess-Argo/main/install.sh
+wget -O install.sh https://raw.githubusercontent.com/als168/VMess-VLess-Argo/main/install.sh
 sh install.sh
 ```
 2. 获取配置参数
