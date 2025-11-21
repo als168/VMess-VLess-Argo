@@ -1,12 +1,11 @@
 #!/bin/sh
 # VMess/VLESS + Argo 一键脚本
-# 支持多系统 + NAT VPS 检测 + 双协议选择 + 守护进程
+# 支持多系统 + NAT VPS 检测 + 双协议选择 + 守护进程 + 客户端配置生成
 
 set -e
 
 UUID=$(cat /proc/sys/kernel/random/uuid)
 WS_PATH="/$(head -n 10 /dev/urandom | md5sum | cut -c1-8)"
-
 OS=$(grep ^ID= /etc/os-release | cut -d= -f2 | tr -d '"')
 
 # 安装 v2ray
@@ -83,23 +82,16 @@ if [ "$PROTO" = "1" ]; then
       "protocol": "vmess",
       "settings": {
         "clients": [
-          {
-            "id": "$UUID",
-            "alterId": 0
-          }
+          { "id": "$UUID", "alterId": 0 }
         ]
       },
       "streamSettings": {
         "network": "ws",
-        "wsSettings": {
-          "path": "$WS_PATH-vmess"
-        }
+        "wsSettings": { "path": "$WS_PATH-vmess" }
       }
     }
   ],
-  "outbounds": [
-    { "protocol": "freedom" }
-  ]
+  "outbounds": [ { "protocol": "freedom" } ]
 }
 EOF
 elif [ "$PROTO" = "2" ]; then
@@ -113,26 +105,20 @@ elif [ "$PROTO" = "2" ]; then
       "protocol": "vless",
       "settings": {
         "clients": [
-          {
-            "id": "$UUID"
-          }
+          { "id": "$UUID" }
         ]
       },
       "streamSettings": {
         "network": "ws",
-        "wsSettings": {
-          "path": "$WS_PATH-vless"
-        }
+        "wsSettings": { "path": "$WS_PATH-vless" }
       }
     }
   ],
-  "outbounds": [
-    { "protocol": "freedom" }
-  ]
+  "outbounds": [ { "protocol": "freedom" } ]
 }
 EOF
 else
-  # VMess + VLESS 双协议配置
+  # VMess + VLESS 双协议
   cat > /etc/v2ray/config.json <<EOF
 {
   "inbounds": [
@@ -142,17 +128,12 @@ else
       "protocol": "vmess",
       "settings": {
         "clients": [
-          {
-            "id": "$UUID",
-            "alterId": 0
-          }
+          { "id": "$UUID", "alterId": 0 }
         ]
       },
       "streamSettings": {
         "network": "ws",
-        "wsSettings": {
-          "path": "$WS_PATH-vmess"
-        }
+        "wsSettings": { "path": "$WS_PATH-vmess" }
       }
     },
     {
@@ -161,22 +142,16 @@ else
       "protocol": "vless",
       "settings": {
         "clients": [
-          {
-            "id": "$UUID"
-          }
+          { "id": "$UUID" }
         ]
       },
       "streamSettings": {
         "network": "ws",
-        "wsSettings": {
-          "path": "$WS_PATH-vless"
-        }
+        "wsSettings": { "path": "$WS_PATH-vless" }
       }
     }
   ],
-  "outbounds": [
-    { "protocol": "freedom" }
-  ]
+  "outbounds": [ { "protocol": "freedom" } ]
 }
 EOF
 fi
@@ -232,11 +207,42 @@ else
   FINAL_DOMAIN=$(echo $ARGO_DOMAIN | sed 's#https://##')
 fi
 
-echo "===================================="
-echo " VMess/VLESS + Argo 配置完成！"
-echo " 系统类型: $OS"
-echo " NAT VPS: $NAT_MODE"
-echo " UUID: $UUID"
-echo " WS 路径: $WS_PATH"
-echo " 使用域名: $FINAL_DOMAIN"
-echo "===================================="
+# 自动生成客户端配置文件
+mkdir -p /root/clients
+
+cat > /root/clients/clash-meta.yaml <<EOF
+proxies:
+  - name: vmess-argo
+    type: vmess
+    server: $FINAL_DOMAIN
+    port: 443
+    uuid: $UUID
+    alterId: 0
+    cipher: auto
+    tls: true
+    network: ws
+    ws-opts:
+      path: $WS_PATH-vmess
+      headers:
+        Host: $FINAL_DOMAIN
+
+  - name: vless-argo
+    type: vless
+    server: $FINAL_DOMAIN
+    port: 443
+    uuid: $UUID
+    tls: true
+    network: ws
+    udp: true
+    ws-opts:
+      path: $WS_PATH-vless
+      headers:
+        Host: $FINAL_DOMAIN
+EOF
+
+cat > /root/clients/v2rayng.json <<EOF
+{
+  "outbounds": [
+    {
+      "protocol": "vmess",
+      "settings": {
